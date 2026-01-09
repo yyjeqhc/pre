@@ -58,7 +58,11 @@ fn process_toml_doc(doc: &mut DocumentMut) {
 }
 
 fn remove_non_linux_targets(doc: &mut DocumentMut) {
-    // target section的结构是 [target] 下有多个子表
+    // target配置在TOML中可能有两种形式：
+    // 1. [target] 表下的子项: target.cfg(...)
+    // 2. 直接的表名: [target.'cfg(...)'.dependencies.xxx]
+    
+    // 处理第一种形式：[target] 表下的子项
     if let Some(target_table) = doc.get_mut("target").and_then(|t| t.as_table_mut()) {
         let keys_to_remove: Vec<String> = target_table
             .iter()
@@ -76,27 +80,92 @@ fn remove_non_linux_targets(doc: &mut DocumentMut) {
             target_table.remove(key);
         }
     }
+    
+    // 处理第二种形式：直接的 [target.'cfg(...)'.xxx] 表
+    let keys_to_remove: Vec<String> = doc
+        .iter()
+        .filter_map(|(key, _)| {
+            let key_str = key;
+            if key_str.starts_with("target.") {
+                // 提取 cfg(...) 部分
+                if let Some(cfg_part) = extract_cfg_from_target_key(key_str) {
+                    if should_remove_target_config(&cfg_part) {
+                        return Some(key_str.to_string());
+                    }
+                }
+            }
+            None
+        })
+        .collect();
+    
+    for key in keys_to_remove {
+        doc.remove(&key);
+    }
+}
+
+fn extract_cfg_from_target_key(key: &str) -> Option<String> {
+    // 从 "target.'cfg(unix)'.dependencies.libc" 提取 "cfg(unix)"
+    // 或从 "target.cfg(windows).dependencies.xxx" 提取 "cfg(windows)"
+    if let Some(rest) = key.strip_prefix("target.") {
+        // 尝试匹配引号形式: 'cfg(...)'  或 "cfg(...)"
+        if rest.starts_with('\'') || rest.starts_with('"') {
+            let quote = rest.chars().next().unwrap();
+            if let Some(end_pos) = rest[1..].find(quote) {
+                return Some(rest[1..end_pos+1].to_string());
+            }
+        }
+        // 尝试匹配无引号形式: cfg(...).xxx
+        if let Some(dot_pos) = rest.find('.') {
+            return Some(rest[..dot_pos].to_string());
+        }
+        // 整个部分都是cfg
+        return Some(rest.to_string());
+    }
+    None
 }
 
 fn should_remove_target_config(key: &str) -> bool {
-    // key 格式类似: 'cfg(target_os = "wasi")' 或 "cfg(windows)"
+    // key 格式类似: 'cfg(target_os = "wasi")' 或 "cfg(windows)" 或 "cfg(unix)"
     
-    // 保留明确的linux配置
-    if key.contains("target_os = \"linux\"") ||
-       key.contains("target_os=\"linux\"") {
+    // 如果配置包含 "not("，通常是排除某些特定平台的通用配置，保留
+    if key.contains("not(") {
         return false;
     }
     
-    // 保留复杂的unix配置（通常是排除其他系统后剩下的Linux）
-    // 例如: cfg(all(unix, not(any(target_os = "redox", target_family = "wasm", ...))))
-    if key.contains("unix") && 
-       key.contains("not(any(") &&
-       !key.contains("target_os = \"linux\"") {
-        // 这通常是Linux的配置（unix排除了macos/ios/android等）
+    // 保留unix和linux
+    if key.contains("unix") || key.contains("linux") {
         return false;
     }
     
-    // 删除所有其他平台
+    // 只删除明确指定的非Linux平台
+    // 如果不包含任何平台关键词，则是非平台相关的cfg（如编译标志），应保留
+    let has_platform_keyword = 
+        key.contains("target_os") ||
+        key.contains("target_family") ||
+        key.contains("target_arch") ||
+        key.contains("target_env") ||
+        key.contains("windows") ||
+        key.contains("macos") ||
+        key.contains("darwin") ||
+        key.contains("android") ||
+        key.contains("ios") ||
+        key.contains("wasm") ||
+        key.contains("hermit") ||
+        key.contains("wasi") ||
+        key.contains("redox") ||
+        key.contains("freebsd") ||
+        key.contains("openbsd") ||
+        key.contains("netbsd") ||
+        key.contains("dragonfly") ||
+        key.contains("solaris") ||
+        key.contains("illumos");
+    
+    // 如果没有平台关键词，保留（可能是编译标志如 tracing_unstable）
+    if !has_platform_keyword {
+        return false;
+    }
+    
+    // 有平台关键词，但不是unix/linux，则删除
     true
 }
 
