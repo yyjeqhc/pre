@@ -1,7 +1,16 @@
 [package]
 name = "pre"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[lib]
+name = "pre"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pre"
+path = "src/main.rs"
 
 [dependencies]
 toml_edit = "0.22"
+cargo_toml = "0.20"
