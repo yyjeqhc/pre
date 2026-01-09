@@ -81,31 +81,37 @@ fn remove_non_linux_targets(doc: &mut DocumentMut) {
 fn should_remove_target_config(key: &str) -> bool {
     // key 格式类似: 'cfg(target_os = "wasi")' 或 "cfg(windows)"
     
-    // 保留unix和linux相关的
-    if key.contains("unix") || 
-       key.contains("linux") ||
-       key.contains("hermit") ||
-       key.contains("wasi") {
+    // 保留明确的linux配置
+    if key.contains("target_os = \"linux\"") ||
+       key.contains("target_os=\"linux\"") {
         return false;
     }
     
-    // 删除windows, macos, ios, android相关的
-    key.contains("windows") ||
-    key.contains("macos") ||
-    key.contains("darwin") ||
-    key.contains("android") ||
-    key.contains("ios")
+    // 保留复杂的unix配置（通常是排除其他系统后剩下的Linux）
+    // 例如: cfg(all(unix, not(any(target_os = "redox", target_family = "wasm", ...))))
+    if key.contains("unix") && 
+       key.contains("not(any(") &&
+       !key.contains("target_os = \"linux\"") {
+        // 这通常是Linux的配置（unix排除了macos/ios/android等）
+        return false;
+    }
+    
+    // 删除所有其他平台
+    true
 }
 
 fn collect_non_linux_dependencies(_doc: &DocumentMut) -> HashSet<String> {
     let mut removed = HashSet::new();
     
-    // 常见的Windows/macOS/Android/iOS专属依赖
+    // 常见的非Linux平台专属依赖
     let platform_specific = vec![
+        // Windows
         "windows-sys",
         "winapi",
         "anstyle-wincon",
         "windows",
+        "unicode-segmentation",
+        // macOS/iOS
         "cocoa",
         "core-foundation",
         "core-graphics",
@@ -115,9 +121,26 @@ fn collect_non_linux_dependencies(_doc: &DocumentMut) -> HashSet<String> {
         "objc2-app-kit",
         "objc2-ui-kit",
         "fsevent-sys",
+        "block2",
+        // Android
         "android-activity",
         "ndk",
-        "block2",
+        // WASM
+        "wasm-bindgen",
+        "wasm-bindgen-futures",
+        "js-sys",
+        "web-sys",
+        "web-time",
+        "pin-project",
+        "atomic-waker",
+        "concurrent-queue",
+        "console_error_panic_hook",
+        "tracing-web",
+        // BSD和其他Unix系统
+        "orbclient",
+        "redox_syscall",
+        "wasip2",
+        "r-efi",
     ];
     
     for dep in platform_specific {
@@ -181,27 +204,28 @@ fn clean_features(doc: &mut DocumentMut, removed_deps: &HashSet<String>) {
 
 fn should_remove_feature_name(name: &str) -> bool {
     let lower = name.to_lowercase();
-    // 删除Windows/macOS/Android/iOS相关的feature名称
+    // 删除所有非Linux平台相关的feature名称
     lower == "wincon" || 
     lower == "wgl" ||
     lower.contains("windows") ||
     lower.starts_with("win32") ||
-    lower.starts_with("macos_") ||
-    lower.starts_with("macos-") ||
+    lower.starts_with("macos") ||
     lower.starts_with("android") ||
-    lower.starts_with("ios")
+    lower.starts_with("ios") ||
+    lower.contains("wasm") ||
+    lower.starts_with("bsd")
 }
 
 fn should_remove_feature_item(item: &str, removed_deps: &HashSet<String>) -> bool {
     let lower = item.to_lowercase();
     
-    // 删除对Windows/macOS/Android/iOS特性的引用
+    // 删除对非Linux平台特性的引用
     if lower == "wincon" || 
        lower == "wgl" ||
-       lower.starts_with("macos_") ||
-       lower.starts_with("macos-") ||
+       lower.starts_with("macos") ||
        lower.starts_with("android") ||
-       lower.starts_with("ios") {
+       lower.starts_with("ios") ||
+       lower.contains("wasm") {
         return true;
     }
     
@@ -210,13 +234,13 @@ fn should_remove_feature_item(item: &str, removed_deps: &HashSet<String>) -> boo
         return removed_deps.contains(&dep_name.to_lowercase());
     }
     
-    // 检查是否包含Windows相关的关键词
+    // 检查是否包含非Linux平台的关键词
     if lower.contains("windows") ||
        lower.contains("win32") {
         return true;
     }
     
-    // 检查是否引用了被删除的依赖包（如android-activity, ndk等）
+    // 检查是否引用了被删除的依赖包
     for dep in removed_deps {
         if lower.contains(&dep.to_lowercase()) {
             return true;
