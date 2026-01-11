@@ -12,5 +12,5 @@ name = "pre"
 path = "src/main.rs"
 
 [dependencies]
-toml_edit = "0.22"
-cargo_toml = "0.20"
+toml_edit = "0.24.0"
+cargo_toml = "0.22.3"
