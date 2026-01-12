@@ -212,27 +212,44 @@ fn should_remove_target_config(key: &str) -> bool {
 
     // 定义需要删除的操作系统列表（非Linux系统）
     const NON_LINUX_OS: &[&str] = &[
+        // Windows
         "windows",
+        // macOS/Apple
         "macos",
         "darwin",
-        "android",
         "ios",
         "tvos",
         "watchos",
         "visionos",
+        // Android
+        "android",
+        // WASM
         "wasm",
         "emscripten",
+        // Embedded/Specialized
         "hermit",
         "wasi",
         "redox",
+        "uefi",    // UEFI firmware
+        "vxworks", // VxWorks RTOS
+        "horizon", // Nintendo 3DS
+        "vita",    // PlayStation Vita
+        "nto",     // QNX Neutrino
+        "aix",     // IBM AIX
+        // BSD variants
         "freebsd",
         "openbsd",
         "netbsd",
         "dragonfly",
+        "dragonflybsd",
+        // Other Unix-like
         "solaris",
         "illumos",
         "haiku",
-        "fuchsia",
+        "hurd",   // GNU Hurd
+        "cygwin", // Cygwin on Windows
+        // Other
+        "fuchsia", // Google Fuchsia
         "unknown",
         "none",
     ];
@@ -245,10 +262,10 @@ fn should_remove_target_config(key: &str) -> bool {
 
     // 定义需要删除的 target_env（Windows/非Linux特有的编译环境）
     const NON_LINUX_ENV: &[&str] = &[
-        "msvc",    // Microsoft Visual C++, Windows only
-        "mingw",   // MinGW, Windows only
-        "cygwin",  // Cygwin, Windows only
-        "sgx",     // Intel SGX, not Linux-specific
+        "msvc",   // Microsoft Visual C++, Windows only
+        "mingw",  // MinGW, Windows only
+        "cygwin", // Cygwin, Windows only
+        "sgx",    // Intel SGX, not Linux-specific
     ];
 
     // 定义需要删除的target triple模式
@@ -298,7 +315,11 @@ fn should_remove_target_config(key: &str) -> bool {
     // 只有明确指定了非Linux平台的才删除
     // 只指定 target_arch 的配置保留（适用于所有OS）
     // gnu/musl 等 Linux 特有的 target_env 会被保留
-    has_non_linux_os || has_non_linux_family || has_non_linux_vendor || has_non_linux_env || has_non_linux_triple
+    has_non_linux_os
+        || has_non_linux_family
+        || has_non_linux_vendor
+        || has_non_linux_env
+        || has_non_linux_triple
 }
 
 /// 获取已知的平台特定依赖列表
