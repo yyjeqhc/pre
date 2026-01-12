@@ -44,11 +44,13 @@ impl From<cargo_toml::Error> for ProcessError {
 ///
 /// 使用 cargo_toml 解析 Cargo.toml 来智能识别平台特定依赖
 pub fn process_toml_file(input_path: &str, output_path: &str) -> Result<(), ProcessError> {
-    // 使用 cargo_toml 解析获取依赖信息
-    let manifest = Manifest::from_path(input_path)?;
+    // 读取文件内容
+    let content = fs::read_to_string(input_path)?;
+
+    // 使用 cargo_toml 从字节解析（避免工作区查找问题）
+    let manifest = Manifest::from_slice(content.as_bytes())?;
 
     // 使用 toml_edit 编辑保留格式
-    let content = fs::read_to_string(input_path)?;
     let mut doc = content.parse::<DocumentMut>()?;
 
     process_toml_doc(&mut doc, &manifest);
@@ -208,42 +210,82 @@ fn should_remove_target_config(key: &str) -> bool {
         return false;
     }
 
-    // 检查是否包含平台关键词
-    let has_platform_keyword = key.contains("target_os") ||
-        key.contains("target_family") ||
-        key.contains("target_arch") ||
-        key.contains("target_env") ||
-        key.contains("windows") ||
-        key.contains("macos") ||
-        key.contains("darwin") ||
-        key.contains("android") ||
-        key.contains("ios") ||
-        key.contains("wasm") ||
-        key.contains("hermit") ||
-        key.contains("wasi") ||
-        key.contains("redox") ||
-        key.contains("freebsd") ||
-        key.contains("openbsd") ||
-        key.contains("netbsd") ||
-        key.contains("dragonfly") ||
-        key.contains("solaris") ||
-        key.contains("illumos") ||
-        // target triples
-        key.contains("-msvc") ||
-        key.contains("-gnu-") ||
-        key.contains("-musl") ||
-        key.contains("wasm32-") ||
-        key.contains("x86_64-pc-windows") ||
-        key.contains("x86_64-apple-darwin") ||
-        key.contains("aarch64-apple-");
+    // 定义需要删除的操作系统列表（非Linux系统）
+    const NON_LINUX_OS: &[&str] = &[
+        "windows",
+        "macos",
+        "darwin",
+        "android",
+        "ios",
+        "tvos",
+        "watchos",
+        "visionos",
+        "wasm",
+        "emscripten",
+        "hermit",
+        "wasi",
+        "redox",
+        "freebsd",
+        "openbsd",
+        "netbsd",
+        "dragonfly",
+        "solaris",
+        "illumos",
+        "haiku",
+        "fuchsia",
+        "unknown",
+        "none",
+    ];
 
-    // 如果没有平台关键词，保留（可能是编译标志）
-    if !has_platform_keyword {
-        return false;
+    // 定义需要删除的平台家族
+    const NON_LINUX_FAMILY: &[&str] = &["wasm"];
+
+    // 定义需要删除的vendor
+    const NON_LINUX_VENDOR: &[&str] = &["apple"];
+
+    // 定义需要删除的target triple模式
+    const NON_LINUX_TRIPLE_PATTERNS: &[&str] = &[
+        "-msvc",
+        "wasm32-",
+        "wasm64-",
+        "x86_64-pc-windows",
+        "i686-pc-windows",
+        "x86_64-apple-",
+        "aarch64-apple-",
+    ];
+
+    // 检查 cfg(os_name) 简写形式（等价于 target_os = "os_name"）
+    for os in NON_LINUX_OS {
+        // cfg(windows), cfg( windows ), cfg(windows )
+        if key.contains(&format!("cfg({})", os))
+            || key.contains(&format!("cfg( {})", os))
+            || key.contains(&format!("cfg({} )", os))
+            || key.contains(&format!("cfg( {} )", os))
+        {
+            return true;
+        }
     }
 
-    // 有平台关键词，但不是unix/linux，则删除
-    true
+    // 检查 target_os = "os_name" 形式
+    let has_non_linux_os =
+        key.contains("target_os") && NON_LINUX_OS.iter().any(|os| key.contains(os));
+
+    // 检查 target_family = "family" 形式
+    let has_non_linux_family =
+        key.contains("target_family") && NON_LINUX_FAMILY.iter().any(|family| key.contains(family));
+
+    // 检查 target_vendor = "vendor" 形式
+    let has_non_linux_vendor =
+        key.contains("target_vendor") && NON_LINUX_VENDOR.iter().any(|vendor| key.contains(vendor));
+
+    // 检查是否是特定的target triple
+    let has_non_linux_triple = NON_LINUX_TRIPLE_PATTERNS
+        .iter()
+        .any(|pattern| key.contains(pattern));
+
+    // 只有明确指定了非Linux平台的才删除
+    // 只指定 target_arch 或 target_env 的配置保留（适用于所有OS）
+    has_non_linux_os || has_non_linux_family || has_non_linux_vendor || has_non_linux_triple
 }
 
 /// 获取已知的平台特定依赖列表
