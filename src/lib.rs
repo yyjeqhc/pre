@@ -243,6 +243,14 @@ fn should_remove_target_config(key: &str) -> bool {
     // 定义需要删除的vendor
     const NON_LINUX_VENDOR: &[&str] = &["apple"];
 
+    // 定义需要删除的 target_env（Windows/非Linux特有的编译环境）
+    const NON_LINUX_ENV: &[&str] = &[
+        "msvc",    // Microsoft Visual C++, Windows only
+        "mingw",   // MinGW, Windows only
+        "cygwin",  // Cygwin, Windows only
+        "sgx",     // Intel SGX, not Linux-specific
+    ];
+
     // 定义需要删除的target triple模式
     const NON_LINUX_TRIPLE_PATTERNS: &[&str] = &[
         "-msvc",
@@ -278,14 +286,19 @@ fn should_remove_target_config(key: &str) -> bool {
     let has_non_linux_vendor =
         key.contains("target_vendor") && NON_LINUX_VENDOR.iter().any(|vendor| key.contains(vendor));
 
+    // 检查 target_env = "env" 形式（Windows特有的编译环境）
+    let has_non_linux_env =
+        key.contains("target_env") && NON_LINUX_ENV.iter().any(|env| key.contains(env));
+
     // 检查是否是特定的target triple
     let has_non_linux_triple = NON_LINUX_TRIPLE_PATTERNS
         .iter()
         .any(|pattern| key.contains(pattern));
 
     // 只有明确指定了非Linux平台的才删除
-    // 只指定 target_arch 或 target_env 的配置保留（适用于所有OS）
-    has_non_linux_os || has_non_linux_family || has_non_linux_vendor || has_non_linux_triple
+    // 只指定 target_arch 的配置保留（适用于所有OS）
+    // gnu/musl 等 Linux 特有的 target_env 会被保留
+    has_non_linux_os || has_non_linux_family || has_non_linux_vendor || has_non_linux_env || has_non_linux_triple
 }
 
 /// 获取已知的平台特定依赖列表
