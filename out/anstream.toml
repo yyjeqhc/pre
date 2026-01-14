@@ -87,8 +87,12 @@ exactly = 1
 
 [features]
 auto = ["dep:anstyle-query"]
-default = ["auto"]
+default = [
+    "auto",
+    "wincon",
+]
 test = []
+wincon = []
 
 [lib]
 name = "anstream"

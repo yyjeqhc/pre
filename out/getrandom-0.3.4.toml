@@ -47,6 +47,7 @@ pre-build = [
 
 [features]
 std = []
+wasm_js = []
 
 [lib]
 name = "getrandom"

@@ -66,6 +66,9 @@ version = "1.0.39"
 version = "3.10.0"
 
 [features]
+default = ["macos_fsevent"]
+macos_fsevent = []
+macos_kqueue = ["mio"]
 serde = ["notify-types/serde"]
 serialization-compat-6 = ["notify-types/serialization-compat-6"]
 

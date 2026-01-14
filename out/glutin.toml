@@ -48,7 +48,13 @@ targets = [
 ]
 
 [features]
-default = ["egl", "glx", "x11", "wayland"]
+default = [
+    "egl",
+    "glx",
+    "x11",
+    "wayland",
+    "wgl",
+]
 egl = [
     "glutin_egl_sys",
     "libloading",
@@ -62,6 +68,7 @@ wayland = [
     "wayland-sys",
     "egl",
 ]
+wgl = []
 x11 = ["x11-dl"]
 
 [lib]

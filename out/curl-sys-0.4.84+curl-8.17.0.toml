@@ -46,6 +46,7 @@ ssl = ["openssl-sys"]
 static-curl = []
 static-ssl = ["openssl-sys/vendored"]
 upkeep_7_62_0 = []
+windows-static-ssl = []
 zlib-ng-compat = [
     "libz-sys/zlib-ng",
     "static-curl",

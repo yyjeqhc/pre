@@ -405,17 +405,10 @@ fn get_known_platform_deps() -> HashSet<String> {
 fn clean_features(doc: &mut DocumentMut, removed_deps: &HashSet<String>) {
     if let Some(features) = doc.get_mut("features").and_then(|f| f.as_table_like_mut()) {
         let mut features_to_update: Vec<(String, Vec<String>)> = Vec::new();
-        let mut features_to_remove: Vec<String> = Vec::new();
 
         // 遍历每个feature
         for (name, value) in features.iter() {
             let name_str = name.to_string();
-
-            // 检查feature名称本身是否应该被删除
-            if should_remove_feature_name(&name_str) {
-                features_to_remove.push(name_str);
-                continue;
-            }
 
             if let Some(array) = value.as_array() {
                 let mut new_items = Vec::new();
@@ -432,16 +425,11 @@ fn clean_features(doc: &mut DocumentMut, removed_deps: &HashSet<String>) {
                 }
 
                 if modified {
-                    // 无论是否为空，都保留 feature，只是更新其内容
-                    // 空的 feature 会变成 feature_name = []
+                    // 保留 feature，即使变成空数组
+                    // 例如 wincon = [] 或 std = []
                     features_to_update.push((name_str, new_items));
                 }
             }
-        }
-
-        // 删除Windows相关的feature
-        for name in &features_to_remove {
-            features.remove(name);
         }
 
         // 更新修改后的features（包括空的）
@@ -455,32 +443,8 @@ fn clean_features(doc: &mut DocumentMut, removed_deps: &HashSet<String>) {
     }
 }
 
-fn should_remove_feature_name(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    lower == "wincon"
-        || lower == "wgl"
-        || lower.contains("windows")
-        || lower.starts_with("win32")
-        || lower.starts_with("macos")
-        || lower.starts_with("android")
-        || lower.starts_with("ios")
-        || lower.contains("wasm")
-        || lower.starts_with("bsd")
-}
-
 fn should_remove_feature_item(item: &str, removed_deps: &HashSet<String>) -> bool {
     let lower = item.to_lowercase();
-
-    // 删除对非Linux平台特性的引用
-    if lower == "wincon"
-        || lower == "wgl"
-        || lower.starts_with("macos")
-        || lower.starts_with("android")
-        || lower.starts_with("ios")
-        || lower.contains("wasm")
-    {
-        return true;
-    }
 
     // 检查是否是 dep:xxx 形式
     if let Some(dep_name) = item.strip_prefix("dep:") {
@@ -496,7 +460,13 @@ fn should_remove_feature_item(item: &str, removed_deps: &HashSet<String>) -> boo
         }
     }
 
-    // 检查是否包含非Linux平台的关键词
+    // 如果不包含 'dep:' 或 '/'，说明是对其他 feature 的引用，不删除
+    // 例如 default = ["auto", "wincon"]，这里的 "wincon" 是引用 feature，不是依赖
+    if !item.contains("dep:") && !item.contains('/') {
+        return false;
+    }
+
+    // 其他情况检查是否包含非Linux平台的关键词
     if lower.contains("windows") || lower.contains("win32") {
         return true;
     }

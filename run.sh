@@ -9,5 +9,5 @@ for input_file in test/*.toml; do
     filename=$(basename "$input_file")
     
     # 使用 cargo run 处理每个 .toml 文件，并将结果输出到 out/ 目录中，文件名不变
-    cargo run -- "$input_file" "out/$filename"
+    cargo run -- "$input_file" "now/$filename"
 done

@@ -68,6 +68,8 @@ targets = [
 ]
 
 [features]
+android-game-activity = []
+android-native-activity = []
 default = [
     "rwh_06",
     "x11",
