@@ -431,21 +431,20 @@ fn clean_features(doc: &mut DocumentMut, removed_deps: &HashSet<String>) {
                     }
                 }
 
-                if modified && !new_items.is_empty() {
+                if modified {
+                    // 无论是否为空，都保留 feature，只是更新其内容
+                    // 空的 feature 会变成 feature_name = []
                     features_to_update.push((name_str, new_items));
-                } else if modified && new_items.is_empty() {
-                    // 如果清理后为空，删除整个feature
-                    features_to_remove.push(name_str);
                 }
             }
         }
 
         // 删除Windows相关的feature
-        for name in features_to_remove {
-            features.remove(&name);
+        for name in &features_to_remove {
+            features.remove(name);
         }
 
-        // 更新修改后的features
+        // 更新修改后的features（包括空的）
         for (name, items) in features_to_update {
             let mut new_array = Array::new();
             for item in items {
@@ -488,8 +487,10 @@ fn should_remove_feature_item(item: &str, removed_deps: &HashSet<String>) -> boo
         return removed_deps.contains(&dep_name.to_lowercase()) || removed_deps.contains(dep_name);
     }
 
-    // 检查是否是 crate/feature 形式
-    if let Some(crate_name) = item.split('/').next() {
+    // 检查是否是 crate/feature 或 crate?/feature 形式（可选依赖）
+    if let Some(crate_part) = item.split('/').next() {
+        // 去除可选依赖标记 '?'
+        let crate_name = crate_part.trim_end_matches('?');
         if removed_deps.contains(&crate_name.to_lowercase()) || removed_deps.contains(crate_name) {
             return true;
         }
