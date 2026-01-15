@@ -57,11 +57,7 @@ features = ["serde"]
 [features]
 __internal_bench = []
 alloc = []
-clock = [
-    "winapi",
-    "iana-time-zone",
-    "now",
-]
+clock = ["iana-time-zone", "now"]
 core-error = []
 default = [
     "clock",
@@ -91,11 +87,8 @@ rkyv-64 = [
 rkyv-validation = ["rkyv?/validation"]
 std = ["alloc"]
 unstable-locales = ["pure-rust-locales"]
-wasmbind = [
-    "wasm-bindgen",
-    "js-sys",
-]
-winapi = ["windows-link"]
+wasmbind = []
+winapi = []
 
 [lib]
 name = "chrono"
@@ -149,25 +142,7 @@ version = "1"
 [dev-dependencies.similar-asserts]
 version = "1.6.1"
 
-[target.'cfg(all(target_arch = "wasm32", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies.js-sys]
-version = "0.3"
-optional = true
-
-[target.'cfg(all(target_arch = "wasm32", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies.wasm-bindgen]
-version = "0.2"
-optional = true
-
-[target.'cfg(all(target_arch = "wasm32", not(any(target_os = "emscripten", target_os = "wasi"))))'.dev-dependencies.wasm-bindgen-test]
-version = "0.3"
-
 [target."cfg(unix)".dependencies.iana-time-zone]
 version = "0.1.45"
 features = ["fallback"]
 optional = true
-
-[target."cfg(windows)".dependencies.windows-link]
-version = "0.2"
-optional = true
-
-[target."cfg(windows)".dev-dependencies.windows-bindgen]
-version = "0.63"

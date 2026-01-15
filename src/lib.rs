@@ -289,6 +289,11 @@ fn should_remove_target_config(key: &str) -> bool {
         key
     };
 
+    // 特殊处理：cfg(any()) 总是为真，包含所有平台，应该保留
+    if cfg_str == "cfg(any())" || cfg_str.trim() == "cfg(any())" {
+        return false;
+    }
+
     // 尝试使用 cfg-expr 解析和评估
     if cfg_str.starts_with("cfg(") || cfg_str.contains("target_") {
         // 检查是否匹配任何 Linux 目标

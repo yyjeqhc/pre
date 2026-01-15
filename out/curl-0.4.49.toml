@@ -49,7 +49,10 @@ ssl = [
 static-curl = ["curl-sys/static-curl"]
 static-ssl = ["curl-sys/static-ssl"]
 upkeep_7_62_0 = ["curl-sys/upkeep_7_62_0"]
-windows-static-ssl = ["static-curl"]
+windows-static-ssl = [
+    "static-curl",
+    "curl-sys/windows-static-ssl",
+]
 zlib-ng-compat = [
     "curl-sys/zlib-ng-compat",
     "static-curl",
