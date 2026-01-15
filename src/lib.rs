@@ -1,7 +1,27 @@
 use cargo_toml::Manifest;
+use cfg_expr::{
+    targets::{get_builtin_target_by_triple, TargetInfo},
+    Expression, Predicate,
+};
 use std::collections::HashSet;
 use std::fs;
 use toml_edit::{Array, DocumentMut, Item, Value};
+
+// Linux 目标平台列表（仅 x86_64 和 riscv64 架构）
+fn get_linux_targets() -> Vec<&'static TargetInfo> {
+    cfg_expr::targets::ALL_BUILTINS
+        .iter()
+        .filter(|target| {
+            // 只保留 Linux 系统
+            if target.os != Some(cfg_expr::targets::Os::linux) {
+                return false;
+            }
+            // 只保留 x86_64 和 riscv64 架构
+            target.arch == cfg_expr::targets::Arch::x86_64
+                || target.arch == cfg_expr::targets::Arch::riscv64
+        })
+        .collect()
+}
 
 #[derive(Debug)]
 pub enum ProcessError {
@@ -199,127 +219,87 @@ fn extract_cfg_from_target_key(key: &str) -> Option<String> {
     None
 }
 
-fn should_remove_target_config(key: &str) -> bool {
-    // 如果配置包含 "not("，通常是排除某些特定平台的通用配置，保留
-    if key.contains("not(") {
-        return false;
-    }
+/// 检查 cfg 表达式是否匹配任何 Linux 目标平台
+fn matches_any_linux_target(cfg_str: &str) -> bool {
+    // 尝试解析 cfg 表达式
+    let expr = match Expression::parse(cfg_str) {
+        Ok(expr) => expr,
+        Err(_) => {
+            // 如果解析失败，使用保守策略：检查是否是已知的 target triple
+            return is_linux_target_triple(cfg_str);
+        }
+    };
 
-    // 保留unix和linux
-    if key.contains("unix") || key.contains("linux") {
-        return false;
-    }
+    // 获取所有 Linux 目标平台
+    let linux_targets = get_linux_targets();
 
-    // 定义需要删除的操作系统列表（非Linux系统）
-    const NON_LINUX_OS: &[&str] = &[
-        // Windows
-        "windows",
-        // macOS/Apple
-        "macos",
-        "darwin",
-        "ios",
-        "tvos",
-        "watchos",
-        "visionos",
-        // Android
-        "android",
-        // WASM
-        "wasm",
-        "emscripten",
-        // Embedded/Specialized
-        "hermit",
-        "wasi",
-        "redox",
-        "uefi",    // UEFI firmware
-        "vxworks", // VxWorks RTOS
-        "horizon", // Nintendo 3DS
-        "vita",    // PlayStation Vita
-        "nto",     // QNX Neutrino
-        "aix",     // IBM AIX
-        // BSD variants
-        "freebsd",
-        "openbsd",
-        "netbsd",
-        "dragonfly",
-        "dragonflybsd",
-        // Other Unix-like
-        "solaris",
-        "illumos",
-        "haiku",
-        "hurd",   // GNU Hurd
-        "cygwin", // Cygwin on Windows
-        // Other
-        "fuchsia", // Google Fuchsia
-        "unknown",
-        "none",
-    ];
-
-    // 定义需要删除的平台家族
-    const NON_LINUX_FAMILY: &[&str] = &["wasm"];
-
-    // 定义需要删除的vendor
-    const NON_LINUX_VENDOR: &[&str] = &["apple"];
-
-    // 定义需要删除的 target_env（Windows/非Linux特有的编译环境）
-    const NON_LINUX_ENV: &[&str] = &[
-        "msvc",   // Microsoft Visual C++, Windows only
-        "mingw",  // MinGW, Windows only
-        "cygwin", // Cygwin, Windows only
-        "sgx",    // Intel SGX, not Linux-specific
-    ];
-
-    // 定义需要删除的target triple模式
-    const NON_LINUX_TRIPLE_PATTERNS: &[&str] = &[
-        "-msvc",
-        "wasm32-",
-        "wasm64-",
-        "x86_64-pc-windows",
-        "i686-pc-windows",
-        "x86_64-apple-",
-        "aarch64-apple-",
-    ];
-
-    // 检查 cfg(os_name) 简写形式（等价于 target_os = "os_name"）
-    for os in NON_LINUX_OS {
-        // cfg(windows), cfg( windows ), cfg(windows )
-        if key.contains(&format!("cfg({})", os))
-            || key.contains(&format!("cfg( {})", os))
-            || key.contains(&format!("cfg({} )", os))
-            || key.contains(&format!("cfg( {} )", os))
-        {
+    // 检查表达式是否匹配任何 Linux 目标
+    for target in linux_targets.iter() {
+        if expr.eval(|pred| match pred {
+            Predicate::Target(tp) => tp.matches(*target),
+            Predicate::TargetFeature(_) => false,
+            Predicate::Test => false,
+            Predicate::DebugAssertions => false,
+            Predicate::ProcMacro => false,
+            Predicate::Feature(_) => false,
+            _ => false,
+        }) {
             return true;
         }
     }
 
-    // 检查 target_os = "os_name" 形式
-    let has_non_linux_os =
-        key.contains("target_os") && NON_LINUX_OS.iter().any(|os| key.contains(os));
+    false
+}
 
-    // 检查 target_family = "family" 形式
-    let has_non_linux_family =
-        key.contains("target_family") && NON_LINUX_FAMILY.iter().any(|family| key.contains(family));
+/// 检查是否是 Linux 目标 triple（仅 x86_64 和 riscv64）
+fn is_linux_target_triple(triple: &str) -> bool {
+    if let Some(target) = get_builtin_target_by_triple(triple) {
+        // 必须是 Linux 系统
+        if target.os != Some(cfg_expr::targets::Os::linux) {
+            return false;
+        }
+        // 必须是 x86_64 或 riscv64 架构
+        return target.arch == cfg_expr::targets::Arch::x86_64
+            || target.arch == cfg_expr::targets::Arch::riscv64;
+    }
+    // 如果不是内置的 triple，检查是否同时包含 linux 和 (x86_64 或 riscv64) 关键词
+    triple.contains("linux") && (triple.contains("x86_64") || triple.contains("riscv64"))
+}
 
-    // 检查 target_vendor = "vendor" 形式
-    let has_non_linux_vendor =
-        key.contains("target_vendor") && NON_LINUX_VENDOR.iter().any(|vendor| key.contains(vendor));
+fn should_remove_target_config(key: &str) -> bool {
+    // 首先尝试识别并解析 cfg 表达式
+    let cfg_str = if key.starts_with("cfg(") {
+        // 直接的 cfg(...) 形式
+        key
+    } else if let Some(rest) = key.strip_prefix("target.") {
+        // target.'cfg(...)'... 形式，提取 cfg 部分
+        if rest.starts_with('\'') || rest.starts_with('"') {
+            let quote = rest.chars().next().unwrap();
+            if let Some(end_pos) = rest[1..].find(quote) {
+                &rest[1..end_pos + 1]
+            } else {
+                key
+            }
+        } else if let Some(dot_pos) = rest.find('.') {
+            &rest[..dot_pos]
+        } else {
+            rest
+        }
+    } else {
+        key
+    };
 
-    // 检查 target_env = "env" 形式（Windows特有的编译环境）
-    let has_non_linux_env =
-        key.contains("target_env") && NON_LINUX_ENV.iter().any(|env| key.contains(env));
+    // 尝试使用 cfg-expr 解析和评估
+    if cfg_str.starts_with("cfg(") || cfg_str.contains("target_") {
+        // 检查是否匹配任何 Linux 目标
+        let matches_linux = matches_any_linux_target(cfg_str);
 
-    // 检查是否是特定的target triple
-    let has_non_linux_triple = NON_LINUX_TRIPLE_PATTERNS
-        .iter()
-        .any(|pattern| key.contains(pattern));
+        // 如果匹配 Linux，保留；否则删除
+        return !matches_linux;
+    }
 
-    // 只有明确指定了非Linux平台的才删除
-    // 只指定 target_arch 的配置保留（适用于所有OS）
-    // gnu/musl 等 Linux 特有的 target_env 会被保留
-    has_non_linux_os
-        || has_non_linux_family
-        || has_non_linux_vendor
-        || has_non_linux_env
-        || has_non_linux_triple
+    // 对于非 cfg 表达式（可能是 target triple），检查是否是 Linux triple
+    !is_linux_target_triple(cfg_str)
 }
 
 /// 获取已知的平台特定依赖列表
@@ -444,33 +424,27 @@ fn clean_features(doc: &mut DocumentMut, removed_deps: &HashSet<String>) {
 }
 
 fn should_remove_feature_item(item: &str, removed_deps: &HashSet<String>) -> bool {
-    let lower = item.to_lowercase();
-
-    // 检查是否是 dep:xxx 形式
+    // 检查是否是 dep:xxx 形式（明确的依赖引用）
     if let Some(dep_name) = item.strip_prefix("dep:") {
         return removed_deps.contains(&dep_name.to_lowercase()) || removed_deps.contains(dep_name);
     }
 
-    // 检查是否是 crate/feature 或 crate?/feature 形式（可选依赖）
-    if let Some(crate_part) = item.split('/').next() {
-        // 去除可选依赖标记 '?'
-        let crate_name = crate_part.trim_end_matches('?');
-        if removed_deps.contains(&crate_name.to_lowercase()) || removed_deps.contains(crate_name) {
-            return true;
+    // 检查是否是 crate/feature 或 crate?/feature 形式（依赖的 feature）
+    if item.contains('/') {
+        if let Some(crate_part) = item.split('/').next() {
+            // 去除可选依赖标记 '?'
+            let crate_name = crate_part.trim_end_matches('?');
+            if removed_deps.contains(&crate_name.to_lowercase())
+                || removed_deps.contains(crate_name)
+            {
+                return true;
+            }
         }
-    }
-
-    // 如果不包含 'dep:' 或 '/'，说明是对其他 feature 的引用，不删除
-    // 例如 default = ["auto", "wincon"]，这里的 "wincon" 是引用 feature，不是依赖
-    if !item.contains("dep:") && !item.contains('/') {
         return false;
     }
 
-    // 其他情况检查是否包含非Linux平台的关键词
-    if lower.contains("windows") || lower.contains("win32") {
-        return true;
-    }
-
-    // 检查是否引用了被删除的依赖包
-    removed_deps.contains(&lower) || removed_deps.contains(item)
+    // 对于纯名称形式，检查是否是被删除的依赖包
+    // 如果在 removed_deps 中，说明这是对依赖包的隐式引用，应该删除
+    // 否则认为是对其他 feature 的引用，保留
+    removed_deps.contains(&item.to_lowercase()) || removed_deps.contains(item)
 }

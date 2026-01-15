@@ -53,12 +53,5 @@ openssl-on-win32 = ["openssl-sys"]
 vendored-openssl = ["openssl-sys/vendored"]
 zlib-ng-compat = ["libz-sys/zlib-ng"]
 
-[target.'cfg(target_env = "msvc")'.build-dependencies.vcpkg]
-version = "0.2"
-
 [target."cfg(unix)".dependencies.openssl-sys]
 version = "0.9.35"
-
-[target."cfg(windows)".dependencies.openssl-sys]
-version = "0.9.35"
-optional = true

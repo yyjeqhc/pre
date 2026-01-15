@@ -78,11 +78,7 @@ features = [
 [features]
 default = ["log"]
 net = []
-os-ext = [
-    "os-poll",
-    "windows-sys/Win32_System_Pipes",
-    "windows-sys/Win32_Security",
-]
+os-ext = ["os-poll"]
 os-poll = []
 
 [lib]
@@ -124,31 +120,8 @@ default-features = false
 [dev-dependencies.rand]
 version = "0.9"
 
-[target.'cfg(target_os = "hermit")'.dependencies.libc]
-version = "0.2.178"
-
-[target.'cfg(target_os = "wasi")'.dependencies.libc]
-version = "0.2.178"
-
-[target.'cfg(target_os = "wasi")'.dependencies.wasi]
-version = "0.11.0"
-
 [target."cfg(unix)".dependencies.libc]
 version = "0.2.178"
-
-[target."cfg(windows)".dependencies.windows-sys]
-version = "0.61"
-features = [
-    "Wdk_Foundation",
-    "Wdk_Storage_FileSystem",
-    "Wdk_System_IO",
-    "Win32_Foundation",
-    "Win32_Networking_WinSock",
-    "Win32_Storage_FileSystem",
-    "Win32_Security",
-    "Win32_System_IO",
-    "Win32_System_WindowsProgramming",
-]
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

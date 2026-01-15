@@ -67,20 +67,10 @@ version = "3.10.0"
 
 [features]
 default = ["macos_fsevent"]
-macos_fsevent = ["fsevent-sys"]
-macos_kqueue = [
-    "kqueue",
-    "mio",
-]
+macos_fsevent = []
+macos_kqueue = ["mio"]
 serde = ["notify-types/serde"]
 serialization-compat-6 = ["notify-types/serialization-compat-6"]
-
-[target."cfg(any(target_os=\"freebsd\", target_os=\"openbsd\", target_os = \"netbsd\", target_os = \"dragonflybsd\", target_os = \"ios\"))".dependencies.kqueue]
-version = "1.1.1"
-
-[target."cfg(any(target_os=\"freebsd\", target_os=\"openbsd\", target_os = \"netbsd\", target_os = \"dragonflybsd\", target_os = \"ios\"))".dependencies.mio]
-version = "1.0"
-features = ["os-ext"]
 
 [target."cfg(any(target_os=\"linux\", target_os=\"android\"))".dependencies.inotify]
 version = "0.11.0"
@@ -89,33 +79,3 @@ default-features = false
 [target."cfg(any(target_os=\"linux\", target_os=\"android\"))".dependencies.mio]
 version = "1.0"
 features = ["os-ext"]
-
-[target."cfg(target_os = \"windows\")".dev-dependencies.trash]
-version = "5.2.2"
-
-[target."cfg(target_os=\"macos\")".dependencies.bitflags]
-version = "2.7.0"
-
-[target."cfg(target_os=\"macos\")".dependencies.fsevent-sys]
-version = "4.0.0"
-optional = true
-
-[target."cfg(target_os=\"macos\")".dependencies.kqueue]
-version = "1.1.1"
-optional = true
-
-[target."cfg(target_os=\"macos\")".dependencies.mio]
-version = "1.0"
-features = ["os-ext"]
-optional = true
-
-[target."cfg(windows)".dependencies.windows-sys]
-version = "0.60.1"
-features = [
-    "Win32_System_Threading",
-    "Win32_Foundation",
-    "Win32_Storage_FileSystem",
-    "Win32_Security",
-    "Win32_System_WindowsProgramming",
-    "Win32_System_IO",
-]

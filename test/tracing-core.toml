@@ -57,10 +57,7 @@ rustc-args = [
 status = "actively-developed"
 
 [features]
-default = [
-    "std",
-    "valuable?/std",
-]
+default = ["std"]
 std = ["once_cell"]
 
 [lib]
@@ -90,11 +87,6 @@ path = "tests/missed_register_callsite.rs"
 [dependencies.once_cell]
 version = "1.13.0"
 optional = true
-
-[target."cfg(tracing_unstable)".dependencies.valuable]
-version = "0.1.0"
-optional = true
-default-features = false
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

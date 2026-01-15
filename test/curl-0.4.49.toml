@@ -145,14 +145,3 @@ optional = true
 [target."cfg(all(unix))".dependencies.openssl-sys]
 version = "0.9.64"
 optional = true
-
-[target.'cfg(target_env = "msvc")'.dependencies.schannel]
-version = "0.1.13"
-
-[target.'cfg(target_env = "msvc")'.dependencies.windows-sys]
-version = "0.59"
-features = [
-    "Win32_Foundation",
-    "Win32_System_LibraryLoader",
-    "Win32_Security_Cryptography",
-]
