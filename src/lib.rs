@@ -221,11 +221,20 @@ fn extract_cfg_from_target_key(key: &str) -> Option<String> {
 
 /// 检查 cfg 表达式是否匹配任何 Linux 目标平台
 fn matches_any_linux_target(cfg_str: &str) -> bool {
+    // 快速检查：如果明确包含 Linux 相关的条件，直接返回 true
+    if contains_linux_condition(cfg_str) {
+        return true;
+    }
+
     // 尝试解析 cfg 表达式
     let expr = match Expression::parse(cfg_str) {
         Ok(expr) => expr,
         Err(_) => {
-            // 如果解析失败，使用保守策略：检查是否是已知的 target triple
+            // 如果解析失败（可能因为包含自定义 cfg 标志），
+            // 再次检查是否包含 Linux 条件
+            if cfg_str.contains("target_os") && cfg_str.contains("linux") {
+                return true;
+            }
             return is_linux_target_triple(cfg_str);
         }
     };
@@ -246,6 +255,34 @@ fn matches_any_linux_target(cfg_str: &str) -> bool {
         }) {
             return true;
         }
+    }
+
+    false
+}
+
+/// 快速检查字符串是否包含明确的 Linux 相关条件
+fn contains_linux_condition(s: &str) -> bool {
+    // 检查是否包含明确的 Linux OS 声明
+    if s.contains("target_os") && s.contains("\"linux\"") {
+        return true;
+    }
+
+    // 检查是否包含 unix family（在排除其他非 Linux Unix 系统后）
+    if s.contains("target_family") && s.contains("\"unix\"") {
+        // 但如果同时排除了 Linux 不支持的系统，那就是针对 Linux 的
+        if s.contains("not")
+            && (s.contains("macos")
+                || s.contains("ios")
+                || s.contains("android")
+                || s.contains("redox"))
+        {
+            return true;
+        }
+    }
+
+    // 检查 cfg(unix) 简写形式
+    if s.contains("cfg(unix)") || (s.contains("unix") && !s.contains("target_")) {
+        return true;
     }
 
     false
