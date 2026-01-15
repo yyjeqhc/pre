@@ -115,6 +115,18 @@ fn remove_non_linux_targets(doc: &mut DocumentMut, manifest: &Manifest) -> HashS
     let mut removed_deps = HashSet::new();
     let mut kept_deps = HashSet::new();
 
+    // 收集普通 dependencies 中的所有依赖
+    let mut normal_deps = HashSet::new();
+    for (dep_name, _) in &manifest.dependencies {
+        normal_deps.insert(dep_name.clone());
+    }
+    for (dep_name, _) in &manifest.dev_dependencies {
+        normal_deps.insert(dep_name.clone());
+    }
+    for (dep_name, _) in &manifest.build_dependencies {
+        normal_deps.insert(dep_name.clone());
+    }
+
     // 使用 cargo_toml 提取所有 target-specific 依赖
     for (target_spec, target_dep) in &manifest.target {
         // 检查这个 target 是否应该被删除
@@ -143,13 +155,13 @@ fn remove_non_linux_targets(doc: &mut DocumentMut, manifest: &Manifest) -> HashS
         }
     }
 
-    // 从 removed_deps 中移除那些在 kept_deps 中也存在的依赖
+    // 从 removed_deps 中移除那些在 kept_deps 或 normal_deps 中也存在的依赖
     // 只有完全被删除的依赖才应该被标记
-    removed_deps.retain(|dep| !kept_deps.contains(dep));
+    removed_deps.retain(|dep| !kept_deps.contains(dep) && !normal_deps.contains(dep));
 
-    // 添加已知的平台特定依赖（仅那些不在kept_deps中的）
+    // 添加已知的平台特定依赖（仅那些不在kept_deps和normal_deps中的）
     for dep in get_known_platform_deps() {
-        if !kept_deps.contains(&dep) {
+        if !kept_deps.contains(&dep) && !normal_deps.contains(&dep) {
             removed_deps.insert(dep);
         }
     }
