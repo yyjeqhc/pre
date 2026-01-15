@@ -70,5 +70,20 @@ version = "0.5"
 [features]
 alloc = []
 default = ["std"]
-js = ["std"]
+js = [
+    "std",
+    "getrandom",
+]
 std = ["alloc"]
+
+[target.'cfg(all(any(target_arch = "wasm32", target_arch = "wasm64"), target_os = "unknown"))'.dependencies.getrandom]
+version = "0.2"
+features = ["js"]
+optional = true
+
+[target.'cfg(all(any(target_arch = "wasm32", target_arch = "wasm64"), target_os = "unknown"))'.dev-dependencies.getrandom]
+version = "0.2"
+features = ["js"]
+
+[target.'cfg(all(any(target_arch = "wasm32", target_arch = "wasm64"), target_os = "unknown"))'.dev-dependencies.wasm-bindgen-test]
+version = "0.3"

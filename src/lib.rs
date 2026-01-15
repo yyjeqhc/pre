@@ -115,15 +115,10 @@ fn remove_non_linux_targets(doc: &mut DocumentMut, manifest: &Manifest) -> HashS
     let mut removed_deps = HashSet::new();
     let mut kept_deps = HashSet::new();
 
-    // 收集普通 dependencies 中的所有依赖
+    // 收集普通 dependencies 中的所有依赖（仅 dependencies，不包括 dev/build）
+    // features 只能引用普通的 dependencies 和 optional dependencies
     let mut normal_deps = HashSet::new();
     for (dep_name, _) in &manifest.dependencies {
-        normal_deps.insert(dep_name.clone());
-    }
-    for (dep_name, _) in &manifest.dev_dependencies {
-        normal_deps.insert(dep_name.clone());
-    }
-    for (dep_name, _) in &manifest.build_dependencies {
         normal_deps.insert(dep_name.clone());
     }
 
@@ -131,25 +126,14 @@ fn remove_non_linux_targets(doc: &mut DocumentMut, manifest: &Manifest) -> HashS
     for (target_spec, target_dep) in &manifest.target {
         // 检查这个 target 是否应该被删除
         if should_remove_target_config(target_spec) {
-            // 收集此 target 下的所有依赖（候选删除列表）
+            // 收集此 target 下的 dependencies（候选删除列表）
+            // 只收集 dependencies，不收集 dev_dependencies 和 build_dependencies
             for (dep_name, _) in &target_dep.dependencies {
-                removed_deps.insert(dep_name.clone());
-            }
-            for (dep_name, _) in &target_dep.dev_dependencies {
-                removed_deps.insert(dep_name.clone());
-            }
-            for (dep_name, _) in &target_dep.build_dependencies {
                 removed_deps.insert(dep_name.clone());
             }
         } else {
-            // 保留的 target，记录其依赖
+            // 保留的 target，记录其 dependencies
             for (dep_name, _) in &target_dep.dependencies {
-                kept_deps.insert(dep_name.clone());
-            }
-            for (dep_name, _) in &target_dep.dev_dependencies {
-                kept_deps.insert(dep_name.clone());
-            }
-            for (dep_name, _) in &target_dep.build_dependencies {
                 kept_deps.insert(dep_name.clone());
             }
         }
